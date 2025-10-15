@@ -1,21 +1,27 @@
+"""
+VDM快捷键触发器V1.0\nWorks with VirtualDesktopManager Alternative Mode
+@Wayne Wu | xenwayne@foxmail.com
+Based on windows-desktop-switcher & AutoHotKey
+"""
+
 from pynput.keyboard import Key, Controller, Listener
 import time
 import threading
 import ctypes
 import configparser
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image
 
 keyboard = Controller()
 
-# 修改：读取配置文件中的等待间隔（config.ini 文件中 [settings] 节的 interval 参数）
+# 读取配置文件中的等待间隔（config.ini 文件中 [settings] 节的 interval 参数）
 def get_sleep_interval():
     config = configparser.ConfigParser()
     config.read("config.ini")
     try:
-        return config.getfloat("settings", "interval", fallback=2.0)
+        return config.getfloat("settings", "interval", fallback=10.0)
     except Exception:
-        return 2.0
+        return 10.0
 
 # 新增：最小化控制台窗口（仅适用于 Windows）
 def minimize_console():
@@ -23,6 +29,7 @@ def minimize_console():
     ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), SW_MINIMIZE)
 
 running = True
+tray_icon = None  # 新增全局变量，用于保存托盘图标对象
 
 # 修改：每次循环检查 running 状态，并读取等待间隔
 def press_keys():
@@ -49,25 +56,21 @@ def press_keys():
         else:
             time.sleep(2)
 
-# 新增：快捷键 F9 切换启停状态
+# 快捷键 F9 切换启停状态，同时更新托盘图标的标题（中文提示，包含作者信息）
 def on_press(key):
-    global running
+    global running, tray_icon
     try:
         if key == Key.f9:
             running = not running
             print("Toggled running:", running)
+            if tray_icon is not None:
+                tray_icon.title = f"VDM快捷键触发器V1.0\nWorks with VirtualDesktopManager Alternative Mode\n@Wayne Wu | xenwayne@foxmail.com\n{'运行中' if running else '已暂停'} - 启停快捷键: F9"
     except AttributeError:
         pass
 
-# 修改：创建托盘图标图像
+# 修改：创建托盘图标函数，改为使用本文件夹下的 icon.ico 文件
 def create_image():
-    # 生成一个新的图标：蓝色背景，白色文本 "AK"
-    width = 64
-    height = 64
-    image = Image.new('RGB', (width, height), color='blue')
-    dc = ImageDraw.Draw(image)
-    dc.text((10, 25), "AK", fill="white")
-    return image
+    return Image.open("icon.ico")
 
 # 新增：退出应用程序的回调
 def exit_app(icon, item):
@@ -83,7 +86,12 @@ if __name__ == "__main__":
     # 启动键盘监听等待 F9 切换启停状态
     listener = Listener(on_press=on_press)
     listener.start()
-    # 新增：创建托盘图标并添加退出菜单
+    # 创建托盘图标时设置初始标题为中文状态、快捷键信息和作者信息
     menu = pystray.Menu(pystray.MenuItem("退出", exit_app))
-    icon = pystray.Icon("AutoKey", create_image(), "Auto Key", menu)
-    icon.run()
+    tray_icon = pystray.Icon(
+        "AutoKey", 
+        create_image(), 
+        f"VDM快捷键触发器V1.0\nWorks with VirtualDesktopManager Alternative Mode\n@Wayne Wu | xenwayne@foxmail.com\n{'运行中' if running else '已暂停'} - 启停快捷键: F9", 
+        menu
+    )
+    tray_icon.run()
